@@ -1,9 +1,9 @@
 import logging
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
-from app.handlers import start, help_cmd, handle_video, error_handler
-from app.config import TOKEN
+from handlers import start, help_cmd, handle_video, error_handler  # Changed from app.handlers
+from config import TOKEN
 
-# Health check server (for Render)
+# Health check server
 from flask import Flask
 server = Flask(__name__)
 
