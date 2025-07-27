@@ -1,10 +1,12 @@
 import logging
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
-from handlers import start, help_cmd, handle_video, error_handler  # Changed from app.handlers
+from handlers import start, help_cmd, handle_video, error_handler
 from config import TOKEN
 
 # Health check server
 from flask import Flask
+from threading import Thread
+
 server = Flask(__name__)
 
 @server.route('/health')
@@ -23,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 def main():
     # Start Flask in background
-    from threading import Thread
     Thread(target=run_flask, daemon=True).start()
 
     # Create bot application
