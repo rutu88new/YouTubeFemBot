@@ -3,7 +3,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from handlers import start, help_cmd, handle_video, error_handler
 from config import TOKEN
 
-# Health check server
+# Health check server (for Render)
 from flask import Flask
 from threading import Thread
 
