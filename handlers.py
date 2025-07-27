@@ -6,13 +6,21 @@ import time
 import os
 import re
 import logging
+import random
 from config import *
 from utils import *
 from pytube import YouTube
 
 logger = logging.getLogger(__name__)
 
-# Renamed from 'start' to 'start_command'
+# List of user agents to rotate
+USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Linux; Android 10; SM-G981B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.162 Mobile Safari/537.36',
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+]
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_msg = escape_markdown(
         "🎬 *YouTube Video Downloader*\n\n"
@@ -25,7 +33,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(welcome_msg, parse_mode="MarkdownV2")
 
-# Renamed from 'help_cmd' to 'help_command'
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_msg = escape_markdown(
         "🛠️ *Bot Help*\n\n"
@@ -35,33 +42,92 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(help_msg, parse_mode="MarkdownV2")
 
-# ... (keep all other functions EXACTLY as-is, including handle_video and error_handler)async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+class ProgressTracker:
+    def __init__(self, update, msg):
+        self.update = update
+        self.msg = msg
+        self.start_time = time.time()
+        self.last_update = time.time()
+        self.last_bytes = 0
+        self.last_speed = 0
+        self.stalled_count = 0
+
+    async def callback(self, d):
+        if d['status'] == 'downloading':
+            now = time.time()
+            downloaded = d.get('downloaded_bytes', 0)
+            total = d.get('total_bytes', 0)
+            speed = d.get('speed', 0)
+
+            if speed == 0 or (downloaded - self.last_bytes) < 1024:
+                self.stalled_count += 1
+                if self.stalled_count % 5 == 0:
+                    status = "⏳ Download is progressing slowly..."
+                    if speed == 0:
+                        status = "⌛ Download paused (waiting for connection)..."
+                    await self.msg.edit_text(status)
+                return
+
+            percent = min(99.9, (downloaded / total) * 100) if total else 0
+            elapsed = now - self.start_time
+            eta = (total - downloaded) / speed if speed else 0
+
+            time_condition = (now - self.last_update >= 5)
+            progress_condition = (abs(percent - (self.last_bytes/total*100 if total else 0)) >= 5)
+            should_update = time_condition or progress_condition
+
+            if should_update:
+                progress_text = (
+                    f"⬇️ Downloading: {percent:.1f}%\n"
+                    f"⚡ Speed: {speed/(1024*1024):.1f} MB/s\n"
+                    f"🕒 Elapsed: {format_time(elapsed)}\n"
+                    f"⏳ Remaining: {format_time(eta)}\n"
+                    f"📦 Size: {downloaded/(1024*1024):.1f}/{total/(1024*1024):.1f} MB\n\n"
+                    "Please be patient, your download is in progress..."
+                )
+
+                try:
+                    await self.msg.edit_text(progress_text)
+                    self.last_update = now
+                    self.last_bytes = downloaded
+                    self.last_speed = speed
+                except Exception as e:
+                    logger.warning(f"Progress update failed: {e}")
+
+async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
     msg = await update.message.reply_text("🔍 Analyzing video...")
     filename = None
 
     try:
-        # First try with optimized yt-dlp (Approach 1)
+        # Small delay to avoid rate limiting
+        await asyncio.sleep(2)
+
+        # ===== Primary Method: Optimized yt-dlp =====
         await msg.edit_text("🔄 Verifying video access...")
+        
         ydl_opts = {
             'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             'outtmpl': 'downloads/%(id)s.%(ext)s',
             'progress_hooks': [ProgressTracker(update, msg).callback],
-            'retries': 10,
-            'fragment_retries': 10,
-            'socket_timeout': 30,
+            'retries': 3,
+            'fragment_retries': 3,
+            'socket_timeout': 15,
             'noplaylist': True,
             'geo_bypass': True,
             'geo_bypass_country': 'US',
-            'ignoreerrors': False,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android', 'web'],
+                    'player_client': ['android_creator', 'web'],
                     'skip': ['hls', 'dash']
                 }
             },
-            'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None,
-            'user_agent': 'Mozilla/5.0 (Linux; Android 10; SM-G981B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.162 Mobile Safari/537.36'
+            'user_agent': random.choice(USER_AGENTS),
+            'http_headers': {
+                'Accept-Language': 'en-US,en;q=0.9',
+                'X-Forwarded-For': f'192.168.{random.randint(1,255)}.{random.randint(1,255)}'
+            },
+            'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None
         }
 
         try:
@@ -69,17 +135,16 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 info = ydl.extract_info(url, download=True)
                 filename = ydl.prepare_filename(info)
         except Exception as ydl_error:
-            logger.warning(f"yt-dlp failed, trying pytube fallback: {ydl_error}")
-            await msg.edit_text("🔄 Trying alternative download method...")
+            logger.warning(f"Primary method failed: {ydl_error}")
+            await msg.edit_text("⚡ Trying alternative download method...")
             
-            # Fallback to pytube (Approach 3)
+            # ===== Fallback Method: pytube =====
             try:
                 yt = YouTube(url)
                 stream = yt.streams.get_highest_resolution()
                 filename = f"downloads/{yt.video_id}.mp4"
                 stream.download(output_path="downloads/", filename=filename)
                 
-                # Create info dict similar to yt-dlp's format
                 info = {
                     'title': yt.title,
                     'duration': yt.length,
@@ -87,9 +152,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     'id': yt.video_id
                 }
             except Exception as pytube_error:
-                raise Exception(f"All download methods failed:\n1. yt-dlp: {str(ydl_error)}\n2. pytube: {str(pytube_error)}")
+                logger.error(f"Fallback method failed: {pytube_error}")
+                raise Exception(f"All download methods failed:\n1. yt-dlp: {str(ydl_error)[:200]}\n2. pytube: {str(pytube_error)[:200]}")
 
-        # Rest of your existing processing logic
+        # File processing
         filesize = os.path.getsize(filename)
         if filesize > MAX_SIZE:
             await msg.edit_text("🔄 Compressing video...")
@@ -125,7 +191,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "🌍 This video appears restricted on our servers.\n"
                 "Possible solutions:\n"
                 "1. Try a different video\n"
-                "2. Contact admin to configure region bypass"
+                "2. Try again later\n"
+                "3. Contact support if issue persists"
             )
     finally:
         if filename and os.path.exists(filename):
@@ -134,3 +201,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.delete()
         except:
             pass
+
+async def error_handler(update: object, context: CallbackContext):
+    logger.error(f"Error: {context.error}", exc_info=True)
+    if update and hasattr(update, 'message'):
+        await update.message.reply_text("⚠️ An error occurred. Please try again.")
