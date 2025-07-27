@@ -3,3 +3,4 @@ yt-dlp==2023.11.16
 ffmpeg-python==0.2.0
 requests==2.31.0
 Flask==2.3.2
+pytube==15.0.0  # New addition for fallback
