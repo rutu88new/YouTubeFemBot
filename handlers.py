@@ -107,28 +107,24 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text("🔄 Verifying video access...")
         
         ydl_opts = {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-            'outtmpl': 'downloads/%(id)s.%(ext)s',
-            'progress_hooks': [ProgressTracker(update, msg).callback],
-            'retries': 3,
-            'fragment_retries': 3,
-            'socket_timeout': 15,
-            'noplaylist': True,
-            'geo_bypass': True,
-            'geo_bypass_country': 'US',
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android_creator', 'web'],
-                    'skip': ['hls', 'dash']
-                }
-            },
-            'user_agent': random.choice(USER_AGENTS),
-            'http_headers': {
-                'Accept-Language': 'en-US,en;q=0.9',
-                'X-Forwarded-For': f'192.168.{random.randint(1,255)}.{random.randint(1,255)}'
-            },
-            'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None
+    'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+    'outtmpl': 'downloads/%(id)s.%(ext)s',
+    'retries': 3,
+    'fragment_retries': 3,
+    'socket_timeout': 15,
+    'noplaylist': True,
+    'geo_bypass': True,
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'web'],
+            'skip': ['hls', 'dash']
         }
+    },
+    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'http_headers': {
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
+}
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
