@@ -67,10 +67,10 @@ class ProgressTracker:
             elapsed = now - self.start_time
             eta = (total - downloaded) / speed if speed else 0
             
-            should_update = (
-                (now - self.last_update >= 5) or 
-                (abs(percent - (self.last_bytes/total*100 if total else 0)) >= 5
-            )
+            # Fixed condition with proper parentheses
+            time_condition = (now - self.last_update >= 5)
+            progress_condition = (abs(percent - (self.last_bytes/total*100 if total else 0)) >= 5)
+            should_update = time_condition or progress_condition
             
             if should_update:
                 progress_text = (
