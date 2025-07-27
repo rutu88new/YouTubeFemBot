@@ -67,7 +67,6 @@ class ProgressTracker:
             elapsed = now - self.start_time
             eta = (total - downloaded) / speed if speed else 0
             
-            # Fixed condition with proper parentheses
             time_condition = (now - self.last_update >= 5)
             progress_condition = (abs(percent - (self.last_bytes/total*100 if total else 0)) >= 5)
             should_update = time_condition or progress_condition
@@ -92,31 +91,25 @@ class ProgressTracker:
 
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
-    if not re.match(r'^(https?://)?(www\.)?(youtube\.com|youtu\.be)/.+', url):
-        await update.message.reply_text("❌ Invalid YouTube URL")
-        return
-
     msg = await update.message.reply_text("🔍 Analyzing video...")
     filename = None
 
     try:
-        await msg.edit_text("🔄 Getting video information...")
-        
-        with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+        # First verify video availability
+        await msg.edit_text("🔄 Verifying video access...")
+        with yt_dlp.YoutubeDL({
+            'quiet': True,
+            'simulate': True,
+            'geo_bypass': True,
+            'extractor_args': {'youtube': {'skip': ['hls', 'dash']}}
+        }) as ydl:
             info = ydl.extract_info(url, download=False)
-            title = info.get('title', 'YouTube Video')[:60]
-            duration = info.get('duration', 0)
-            description = info.get('description', 'No description available')
-            safe_description = f"```\n{description[:800]}\n```" if description else "`No description available`"
+            if not info:
+                raise Exception("Could not extract video info")
+            if info.get('availability') != 'public':
+                raise Exception("Video is not publicly available")
 
-            if duration > MAX_DURATION:
-                await msg.edit_text(
-                    f"❌ Video too long (> {MAX_DURATION//60}m)\n"
-                    f"📌 Max allowed: {MAX_DURATION//60} minutes"
-                )
-                return
-
-        await msg.edit_text("⬇️ Starting download...")
+        await msg.edit_text("⬇️ Starting download (may take a while)...")
         
         filename = f"downloads/{info['id']}.mp4"
         progress = ProgressTracker(update, msg)
@@ -125,9 +118,19 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             'outtmpl': filename,
             'progress_hooks': [progress.callback],
-            'retries': 10,
-            'socket_timeout': 30,
+            'retries': 15,
+            'fragment_retries': 15,
+            'socket_timeout': 60,
             'noplaylist': True,
+            'geo_bypass': True,
+            'ignoreerrors': False,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web'],
+                    'skip': ['hls', 'dash']
+                }
+            },
+            'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -135,7 +138,7 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         filesize = os.path.getsize(filename)
         if filesize > MAX_SIZE:
-            await msg.edit_text("🔄 Compressing video...")
+            await msg.edit_text("🔄 Compressing video (quality preserved)...")
             compressed = f"{filename}_compressed.mp4"
             compress_video(filename, compressed)
             os.remove(filename)
@@ -147,9 +150,9 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_video(
                 video=f,
                 caption=(
-                    f"🎥 {escape_markdown(title)}\n"
-                    f"⏱️ Duration: {duration//60}m{duration%60:02d}s\n\n"
-                    f"📝 Description:\n{safe_description}\n\n"
+                    f"🎥 {escape_markdown(info['title'][:60])}\n"
+                    f"⏱️ Duration: {info['duration']//60}m{info['duration']%60:02d}s\n\n"
+                    f"📝 Description:\n```\n{info.get('description', 'No description')[:800]}\n```\n\n"
                     "⬇️ Downloaded via @YouTubeDownloaderBot"
                 ),
                 parse_mode="MarkdownV2",
@@ -159,9 +162,17 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             
     except Exception as e:
-        error_msg = f"❌ Error: {str(e)[:200]}"
-        await msg.edit_text(escape_markdown(error_msg))
+        error_msg = f"❌ Enhanced download failed: {str(e)[:200]}"
+        await msg.edit_text(error_msg)
         logger.error(f"Download failed: {e}", exc_info=True)
+        
+        if "Video unavailable" in str(e) or "geo-restricted" in str(e).lower():
+            await update.message.reply_text(
+                "🌍 This video appears restricted on our servers.\n"
+                "Possible solutions:\n"
+                "1. Try a different video\n"
+                "2. Contact admin to configure region bypass"
+            )
     finally:
         if filename and os.path.exists(filename):
             os.remove(filename)
