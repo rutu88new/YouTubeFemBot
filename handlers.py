@@ -6,8 +6,8 @@ import time
 import os
 import re
 import logging
-from app.config import *
-from app.utils import *
+from config import *
+from utils import *
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,6 @@ class ProgressTracker:
             total = d.get('total_bytes', 0)
             speed = d.get('speed', 0)
             
-            # Detect stalled downloads
             if speed == 0 or (downloaded - self.last_bytes) < 1024:
                 self.stalled_count += 1
                 if self.stalled_count % 5 == 0:
@@ -64,15 +63,14 @@ class ProgressTracker:
                     await self.msg.edit_text(status)
                 return
             
-            # Calculate progress
             percent = min(99.9, (downloaded / total) * 100) if total else 0
             elapsed = now - self.start_time
             eta = (total - downloaded) / speed if speed else 0
             
-            # Update condition
-            time_passed = now - self.last_update >= 5
-            progress_changed = abs(percent - (self.last_bytes/total*100 if total else 0)) >= 5
-            should_update = time_passed or progress_changed
+            should_update = (
+                (now - self.last_update >= 5) or 
+                (abs(percent - (self.last_bytes/total*100 if total else 0)) >= 5
+            )
             
             if should_update:
                 progress_text = (
@@ -135,7 +133,6 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
-        # Handle large files
         filesize = os.path.getsize(filename)
         if filesize > MAX_SIZE:
             await msg.edit_text("🔄 Compressing video...")
