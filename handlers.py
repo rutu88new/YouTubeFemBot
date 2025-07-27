@@ -8,13 +8,34 @@ import re
 import logging
 from config import *
 from utils import *
-from pytube import YouTube  # New import for fallback
+from pytube import YouTube
 
 logger = logging.getLogger(__name__)
 
-# ... (keep existing start, help_cmd, error_handler, ProgressTracker unchanged)
+# Renamed from 'start' to 'start_command'
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    welcome_msg = escape_markdown(
+        "🎬 *YouTube Video Downloader*\n\n"
+        "Send me a YouTube link to download videos\n\n"
+        "Features:\n"
+        "• Highest quality downloads\n"
+        "• Real-time progress\n"
+        "• Copyable descriptions\n"
+        "• Fast downloads"
+    )
+    await update.message.reply_text(welcome_msg, parse_mode="MarkdownV2")
 
-async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Renamed from 'help_cmd' to 'help_command'
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    help_msg = escape_markdown(
+        "🛠️ *Bot Help*\n\n"
+        "Just send a YouTube link to download\n\n"
+        "Max duration: 20 minutes\n"
+        "Max size: 50MB (larger videos will be compressed)"
+    )
+    await update.message.reply_text(help_msg, parse_mode="MarkdownV2")
+
+# ... (keep all other functions EXACTLY as-is, including handle_video and error_handler)async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
     msg = await update.message.reply_text("🔍 Analyzing video...")
     filename = None
