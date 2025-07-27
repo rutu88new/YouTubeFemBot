@@ -1,5 +1,6 @@
 import re
 import subprocess
+from math import ceil
 
 def escape_markdown(text):
     """Escape all special MarkdownV2 characters"""
