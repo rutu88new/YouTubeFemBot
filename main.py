@@ -1,9 +1,8 @@
 import logging
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
-from handlers import start, help_cmd, handle_video, error_handler
+# Updated imports to match new function names:
+from handlers import start_command, help_command, handle_video, error_handler
 from config import TOKEN
-
-# Health check server (for Render)
 from flask import Flask
 from threading import Thread
 
@@ -16,7 +15,6 @@ def health_check():
 def run_flask():
     server.run(host="0.0.0.0", port=8000)
 
-# Configure logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
@@ -24,19 +22,16 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def main():
-    # Start Flask in background
     Thread(target=run_flask, daemon=True).start()
 
-    # Create bot application
     app = Application.builder().token(TOKEN).build()
-    
-    # Add handlers
+
+    # Updated handler registrations:
     app.add_error_handler(error_handler)
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_cmd))
+    app.add_handler(CommandHandler("start", start_command))  # Matches new name
+    app.add_handler(CommandHandler("help", help_command))   # Matches new name
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_video))
-    
-    # Run bot
+
     logger.info("Starting bot...")
     app.run_polling(
         poll_interval=3.0,
