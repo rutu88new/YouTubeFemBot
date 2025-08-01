@@ -170,7 +170,7 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"🎥 {escape_markdown(info['title'][:60])}\n"
                     f"⏱️ Duration: {info['duration']//60}m{info['duration']%60:02d}s\n\n"
                     f"📝 Description:\n```\n{info.get('description', 'No description')[:800]}\n```\n\n"
-                    "⬇️ Downloaded via @YouTubeDownloaderBot"
+                    "⬇️ Downloaded via @YouTubeFemBot"
                 ),
                 parse_mode="MarkdownV2",
                 supports_streaming=True,
