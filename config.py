@@ -1,7 +1,7 @@
 import os
 
-# Get token from Render environment variables
-TOKEN = os.environ.get('TOKEN')  # Set this in Render dashboard
+# Get token from environment variables (set in Zeabur dashboard)
+TOKEN = os.environ.get('TOKEN')
 MAX_SIZE = 50 * 1024 * 1024  # 50MB
 MAX_DURATION = 1200  # 20 minutes
 
