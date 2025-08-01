@@ -1,0 +1,13 @@
+{
+  "build": {
+    "command": "pip install -r requirements.txt",
+    "outputDir": "."
+  },
+  "deploy": {
+    "startCommand": "gunicorn --bind 0.0.0.0:3000 --timeout 600 main:server",
+    "restartPolicy": {
+      "maxRetries": 5,
+      "delaySeconds": 10
+    }
+  }
+}
