@@ -1,9 +1,12 @@
 import os
 
-# Get token from environment variables (set in Zeabur dashboard)
-TOKEN = os.environ.get('TOKEN')
+# YouTube settings
 MAX_SIZE = 50 * 1024 * 1024  # 50MB
-MAX_DURATION = 1200  # 20 minutes
+MAX_DURATION = 1200  # 20 mins
 
-# Ensure downloads directory exists
-os.makedirs('downloads', exist_ok=True)
+# Tor proxy
+TOR_PROXY = "socks5://127.0.0.1:9050"
+INVIDIOUS_INSTANCE = "https://vid.puffyan.us"  # Fallback API
+
+# Ensure downloads dir exists
+os.makedirs("downloads", exist_ok=True)
