@@ -1,7 +1,6 @@
 python-telegram-bot==20.3
 yt-dlp==2023.11.16
-pytube==15.0.0
+requests==2.31.0
+stem==1.8.2
 ffmpeg-python==0.2.0
-Flask==2.3.2
-gunicorn==21.2.0
-python-dotenv==1.0.0
+pytube==15.0.0
