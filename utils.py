@@ -1,28 +1,31 @@
 import re
 import subprocess
 from math import ceil
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
 def escape_markdown(text):
-    """Escape all special MarkdownV2 characters"""
-    if not text:
-        return ""
     escape_chars = r'_*[]()~`>#+-=|{}.!\\'
     return re.sub(f'([{re.escape(escape_chars)}])', r'\\\1', str(text))
 
 def format_time(seconds):
-    """Format seconds to MM:SS or HH:MM:SS"""
-    seconds = int(seconds)
-    if seconds < 60:
-        return f"{seconds}s"
-    elif seconds < 3600:
-        return f"{seconds//60}m {seconds%60}s"
-    return f"{seconds//3600}h {(seconds%3600)//60}m"
+    mins, secs = divmod(int(seconds), 60)
+    return f"{mins:02d}:{secs:02d}"
 
 def compress_video(input_path, output_path):
-    """Compress video with minimal quality loss"""
     subprocess.run([
         'ffmpeg', '-i', input_path,
-        '-vcodec', 'libx264', '-crf', '18',
+        '-vcodec', 'libx264', '-crf', '23',
         '-preset', 'fast', '-acodec', 'copy',
         output_path
     ], check=True)
+
+async def send_progress(update, msg, percent, speed, eta):
+    progress_bar = "⬢" * int(percent / 10) + "⬡" * (10 - int(percent / 10))
+    text = (
+        f"**Downloading...**\n"
+        f"{progress_bar} {percent:.1f}%\n"
+        f"⚡ **Speed:** {speed/1024/1024:.1f} MB/s\n"
+        f"⏳ **ETA:** {format_time(eta)}\n\n"
+        "_This may take a while for long videos..._"
+    )
+    await msg.edit_text(text, parse_mode="MarkdownV2")
