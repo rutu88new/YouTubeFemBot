@@ -1,21 +1,39 @@
+import os
+import logging
 from telegram.ext import Application, MessageHandler, filters
 from handlers import *
-import logging
 from stem.control import Controller
+from stem import Signal
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
 def renew_tor_ip():
-    with Controller.from_port(port=9051) as c:
-        c.authenticate()
-        c.signal(Signal.NEWNYM)
+    try:
+        with Controller.from_port(port=9051) as c:
+            c.authenticate()
+            c.signal(Signal.NEWNYM)
+            logging.info("Tor IP renewed successfully")
+    except Exception as e:
+        logging.error(f"Tor IP renewal failed: {e}")
+
+async def post_init(app):
+    renew_tor_ip()
 
 def main():
-    app = Application.builder().token(os.getenv("TOKEN")).build()
+    app = Application.builder() \
+        .token(os.getenv("TOKEN")) \
+        .post_init(post_init) \
+        .build()
+
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_video))
     
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_video))
+    # Health check endpoint
+    @app.route('/health')
+    async def health(request):
+        return {"status": "OK"}
 
     app.run_polling()
 
